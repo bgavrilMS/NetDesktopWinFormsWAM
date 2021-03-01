@@ -68,17 +68,22 @@ namespace NetDesktopWinForms
             string clientId = GetClientId();
             bool msaPt = IsMsaPassthroughConfigured();
 
-            var pca = PublicClientApplicationBuilder
+            var pcaBuilder = PublicClientApplicationBuilder
                 .Create(clientId)
                 .WithAuthority(this.authorityCbx.Text)
-                .WithExperimentalFeatures(true)
+                .WithExperimentalFeatures(true);
+
+            if (this.useBrokerChk.Checked)
+            {
+                pcaBuilder = pcaBuilder.WithWindowsBroker(true); // small bug in 4.27, where the flag does not do anything
                 //.WithDesktopFeatures() // in 4.28.0 this is a nicer API to use
                 //.WithBroker(this.useBrokerChk.Checked)
-                .WithWindowsBroker(this.useBrokerChk.Checked)
-                // there is no need to construct the PCA with this redirect URI, 
-                // but WAM uses it. We could enforce it.
-                //.WithRedirectUri($"ms-appx-web://microsoft.aad.brokerplugin/{clientId}")
-                .WithRedirectUri("http://localhost") // fall back to System browser where WAM is not available (Win8, Mac, Linux)
+            }
+
+            // there is no need to construct the PCA with this redirect URI, 
+            // but WAM uses it. We could enforce it.
+            //.WithRedirectUri($"ms-appx-web://microsoft.aad.brokerplugin/{clientId}")
+            var pca = pcaBuilder.WithRedirectUri("http://localhost") // fall back to System browser where WAM is not available (Win8, Mac, Linux)
                 .WithMsaPassthrough(msaPt)
                 .WithLogging((x, y, z) => Debug.WriteLine($"{x} {y}"), LogLevel.Verbose, true)
                 .Build();

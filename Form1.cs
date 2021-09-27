@@ -12,7 +12,6 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Desktop;
-using Microsoft.Identity.Client.MsaPassthrough;
 
 namespace NetDesktopWinForms
 {
@@ -23,10 +22,12 @@ namespace NetDesktopWinForms
 
         private static List<ClientEntry> s_clients = new List<ClientEntry>()
         {
+            new ClientEntry() { Id = "04f0c124-f2bc-4f59-8241-bf6df9866bbd", Name = "04f0c124-f2bc-4f59-8241-bf6df9866bbd (new VS)"},
             new ClientEntry() { Id = "1d18b3b0-251b-4714-a02a-9956cec86c2d", Name = "1d18b3b0-251b-4714-a02a-9956cec86c2d (App in 49f)"},
             new ClientEntry() { Id = "872cd9fa-d31f-45e0-9eab-6e460a02d1f1", Name = "872cd9fa-d31f-45e0-9eab-6e460a02d1f1 (VS)"},
             new ClientEntry() { Id = "655015be-5021-4afc-a683-a4223eb5d0e5", Name = "655015be-5021-4afc-a683-a4223eb5d0e5"},
-            new ClientEntry() { Id = "c0186a6c-0bfc-4d83-9543-c2295b676f3b", Name = "MSA-PT (lab user and tenanted only)"}
+            new ClientEntry() { Id = "c0186a6c-0bfc-4d83-9543-c2295b676f3b", Name = "MSA-PT (lab user and tenanted only)"},
+            new ClientEntry() { Id = "95de633a-083e-42f5-b444-a4295d8e9314", Name = "Whiteboard App"}
         };
 
         private BindingList<AccountModel> s_accounts = new BindingList<AccountModel>();
@@ -68,23 +69,21 @@ namespace NetDesktopWinForms
             string clientId = GetClientId();
             bool msaPt = IsMsaPassthroughConfigured();
 
-            var pcaBuilder = PublicClientApplicationBuilder
+            var pca = PublicClientApplicationBuilder
                 .Create(clientId)
                 .WithAuthority(this.authorityCbx.Text)
-                .WithExperimentalFeatures(true);
-
-            if (this.useBrokerChk.Checked)
-            {
-                pcaBuilder = pcaBuilder.WithWindowsBroker(true); // small bug in 4.27, where the flag does not do anything
-                //.WithDesktopFeatures() // in 4.28.0 this is a nicer API to use
-                //.WithBroker(this.useBrokerChk.Checked)
-            }
-
-            // there is no need to construct the PCA with this redirect URI, 
-            // but WAM uses it. We could enforce it.
-            //.WithRedirectUri($"ms-appx-web://microsoft.aad.brokerplugin/{clientId}")
-            var pca = pcaBuilder.WithRedirectUri("http://localhost") // fall back to System browser where WAM is not available (Win8, Mac, Linux)
-                .WithMsaPassthrough(msaPt)
+                //.WithDesktopFeatures()
+                .WithWindowsBroker()
+                .WithBroker(this.useBrokerChk.Checked)
+                // there is no need to construct the PCA with this redirect URI, 
+                // but WAM uses it. We could enforce it.
+                //.WithRedirectUri($"ms-appx-web://microsoft.aad.brokerplugin/{clientId}")
+                .WithRedirectUri("ms-appx-web://microsoft.aad.brokerplugin/95de633a-083e-42f5-b444-a4295d8e9314")
+                .WithWindowsBrokerOptions(new WindowsBrokerOptions()
+                {
+                    ListWindowsWorkAndSchoolAccounts = cbxListOsAccounts.Checked,
+                    MsaPassthrough = cbxMsaPt.Checked
+                })
                 .WithLogging((x, y, z) => Debug.WriteLine($"{x} {y}"), LogLevel.Verbose, true)
                 .Build();
 
@@ -126,6 +125,7 @@ namespace NetDesktopWinForms
             {
                 Log("Exception: " + ex);
             }
+
         }
 
         private async Task<AuthenticationResult> RunAtsAsync(IPublicClientApplication pca)
@@ -141,7 +141,8 @@ namespace NetDesktopWinForms
             {
                 if (IsMsaPassthroughConfigured())
                 {
-                    throw new InvalidAsynchronousStateException(
+                    // TODO: bogavril - move this exception in WAM
+                    throw new InvalidOperationException(
                         "[TEST APP FAILURE] Do not use login hint on AcquireTokenSilent for MSA-Passthrough. Use the IAccount overload.");
                 }
 
@@ -156,9 +157,30 @@ namespace NetDesktopWinForms
             {
                 var acc = (cbxAccount.SelectedItem as AccountModel).Account;
 
+                var builder = pca.AcquireTokenSilent(GetScopes(), acc);
+                if (IsMsaPassthroughConfigured())
+                {
+                    // this is the same in all clouds
+                    const string PersonalTenantIdV2AAD = "9188040d-6c67-4c5b-b112-36a304b66dad";
+
+                    // these are per cloud
+                    string publicCloudEnv = "https://login.microsoftonline.com/";
+                    string msaTenantIdPublicCloud = "f8cdef31-a31e-4b4a-93e4-5f571e91255a";
+
+                    if (acc.HomeAccountId.TenantId == PersonalTenantIdV2AAD)
+                    {
+                        var msaAuthority = $"{publicCloudEnv}{msaTenantIdPublicCloud}";
+
+                        builder = builder.WithAuthority(msaAuthority);
+                    }
+                }
+                else
+                {
+                    builder = builder.WithAuthority(reqAuthority);
+                }
+
                 Log($"ATS with IAccount for {acc?.Username ?? acc.HomeAccountId.ToString() ?? "null"}");
-                return await pca.AcquireTokenSilent(GetScopes(), acc)
-                    .WithAuthority(reqAuthority)
+                return await builder
                     .ExecuteAsync()
                     .ConfigureAwait(false);
             }
@@ -251,7 +273,14 @@ namespace NetDesktopWinForms
             var scopes = GetScopes();
 
             var builder = pca.AcquireTokenInteractive(scopes)
-                .WithUseEmbeddedWebView(false)
+                .WithUseEmbeddedWebView(true)
+                //.WithExtraQueryParameters("domain_hint=live.com") -- will force AAD login with browser
+                //.WithExtraQueryParameters("msafed=0")             -- will force MSA login with browser
+                .WithEmbeddedWebViewOptions(
+                new EmbeddedWebViewOptions()
+                {
+                    Title = "Hello world",
+                })
                 .WithParentActivityOrWindow(this.Handle);
 
 
@@ -425,15 +454,17 @@ namespace NetDesktopWinForms
             if (clientEntry.Id == "872cd9fa-d31f-45e0-9eab-6e460a02d1f1") // VS
             {
                 cbxScopes.SelectedItem = "https://management.core.windows.net//.default";
-                authorityCbx.SelectedItem = "https://login.microsoftonline.com/organizations";
-                cbxMsaPt.Checked = true;
+            }
+
+            if (clientEntry.Id == "04f0c124-f2bc-4f59-8241-bf6df9866bbd") // VS
+            {
+                cbxScopes.SelectedItem = "https://management.core.windows.net//.default";
             }
 
             if (clientEntry.Id == "c0186a6c-0bfc-4d83-9543-c2295b676f3b") // MSA-PT app
             {
                 cbxScopes.SelectedItem = "api://51eb3dd6-d8b5-46f3-991d-b1d4870de7de/myaccess";
                 authorityCbx.SelectedItem = "https://login.microsoftonline.com/61411618-6f67-4fc5-ba6a-4a0fe32d4eec";
-                cbxMsaPt.Checked = true;
             }
         }
 
@@ -508,7 +539,6 @@ namespace NetDesktopWinForms
         public IAccount Account { get; }
 
         public string DisplayValue { get; }
-        //public string IdValue => $"{_account.HomeAccountId.Identifier}";
 
         public AccountModel(IAccount account, string displayValue = null)
         {

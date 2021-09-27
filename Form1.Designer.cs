@@ -54,6 +54,7 @@
             this.btnExpire = new System.Windows.Forms.Button();
             this.btnRemoveAccount = new System.Windows.Forms.Button();
             this.cbxBackgroundThread = new System.Windows.Forms.CheckBox();
+            this.cbxListOsAccounts = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // resultTbx
@@ -83,7 +84,7 @@
             "https://login.microsoftonline.com/consumers",
             "https://login.microsoftonline.com/49f548d0-12b7-4169-a390-bb5304d24462",
             "https://login.microsoftonline.com/72f988bf-86f1-41af-91ab-2d7cd011db47",
-            "https://login.microsoftonline.com/61411618-6f67-4fc5-ba6a-4a0fe32d4eec",
+            "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a",
             "https://login.windows-ppe.net/organizations",
             "https://login.windows-ppe.net/72f988bf-86f1-41af-91ab-2d7cd011db47"});
             this.authorityCbx.Location = new System.Drawing.Point(73, 42);
@@ -221,7 +222,8 @@
             "User.Read",
             "User.Read User.Read.All",
             "https://management.core.windows.net//.default",
-            "api://51eb3dd6-d8b5-46f3-991d-b1d4870de7de/myaccess"});
+            "api://51eb3dd6-d8b5-46f3-991d-b1d4870de7de/myaccess",
+            "https://graph.microsoft.com/.default"});
             this.cbxScopes.Location = new System.Drawing.Point(73, 69);
             this.cbxScopes.Name = "cbxScopes";
             this.cbxScopes.Size = new System.Drawing.Size(545, 21);
@@ -286,7 +288,7 @@
             // btnRemoveAccount
             // 
             this.btnRemoveAccount.Location = new System.Drawing.Point(402, 178);
-            this.btnRemoveAccount.Name = "button1";
+            this.btnRemoveAccount.Name = "btnRemoveAccount";
             this.btnRemoveAccount.Size = new System.Drawing.Size(89, 23);
             this.btnRemoveAccount.TabIndex = 25;
             this.btnRemoveAccount.Text = "Remove Acc";
@@ -303,11 +305,22 @@
             this.cbxBackgroundThread.Text = "Force background thread";
             this.cbxBackgroundThread.UseVisualStyleBackColor = true;
             // 
+            // cbxListOsAccounts
+            // 
+            this.cbxListOsAccounts.AutoSize = true;
+            this.cbxListOsAccounts.Location = new System.Drawing.Point(92, 155);
+            this.cbxListOsAccounts.Name = "cbxListOsAccounts";
+            this.cbxListOsAccounts.Size = new System.Drawing.Size(107, 17);
+            this.cbxListOsAccounts.TabIndex = 27;
+            this.cbxListOsAccounts.Text = "List OS accounts";
+            this.cbxListOsAccounts.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(634, 642);
+            this.Controls.Add(this.cbxListOsAccounts);
             this.Controls.Add(this.cbxBackgroundThread);
             this.Controls.Add(this.btnRemoveAccount);
             this.Controls.Add(this.btnExpire);
@@ -367,6 +380,7 @@
         private System.Windows.Forms.Button btnExpire;
         private System.Windows.Forms.Button btnRemoveAccount;
         private System.Windows.Forms.CheckBox cbxBackgroundThread;
+        private System.Windows.Forms.CheckBox cbxListOsAccounts;
     }
 }
 

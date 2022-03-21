@@ -46,9 +46,6 @@ namespace NetDesktopWinForms
             clientIdCbx.DisplayMember = "Name";
             clientIdCbx.ValueMember = "Id";
 
-            //var accountBidingSource = new BindingSource();
-            //accountBidingSource.DataSource = s_accounts;
-
             s_accounts.Add(s_nullAccountModel);
             s_accounts.Add(s_osAccountModel);
 
@@ -75,10 +72,8 @@ namespace NetDesktopWinForms
                 //.WithDesktopFeatures()
                 .WithWindowsBroker()
                 .WithBroker(this.useBrokerChk.Checked)
-                // there is no need to construct the PCA with this redirect URI, 
-                // but WAM uses it. We could enforce it.
-                //.WithRedirectUri($"ms-appx-web://microsoft.aad.brokerplugin/{clientId}")
-                .WithRedirectUri("ms-appx-web://microsoft.aad.brokerplugin/95de633a-083e-42f5-b444-a4295d8e9314")
+                // there is no need for this redirect URI to be declared in the app, but WAM uses it, so it needs to be declared in the App Registration Portal!
+                .WithRedirectUri($"ms-appx-web://microsoft.aad.brokerplugin/{clientId}")
                 .WithWindowsBrokerOptions(new WindowsBrokerOptions()
                 {
                     ListWindowsWorkAndSchoolAccounts = cbxListOsAccounts.Checked,
@@ -86,7 +81,7 @@ namespace NetDesktopWinForms
                 })
                 .WithLogging((x, y, z) => Debug.WriteLine($"{x} {y}"), LogLevel.Verbose, true)
                 .Build();
-
+            
             BindCache(pca.UserTokenCache, UserCacheFile);
             return pca;
         }
@@ -470,6 +465,7 @@ namespace NetDesktopWinForms
 
         private async void btnExpire_Click(object sender, EventArgs e)
         {
+
             Log("Expiring tokens.");
 
             var pca = CreatePca();
@@ -477,28 +473,12 @@ namespace NetDesktopWinForms
             // do something that loads the cache first
             await pca.GetAccountsAsync().ConfigureAwait(false);
 
-            string expiredValue = ((long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds)
-                    .ToString(CultureInfo.InvariantCulture);
+            var m = pca.UserTokenCache.GetType().GetRuntimeMethods().Where(n => n.Name == "ExpireAllAccessTokensForTestAsync");
 
-            var accessor = pca.UserTokenCache.GetType()
-                .GetRuntimeProperties()
-                .Single(p => p.Name == "Microsoft.Identity.Client.ITokenCacheInternal.Accessor")
-                .GetValue(pca.UserTokenCache);
-
-            var internalAccessTokens = accessor.GetType().GetMethod("GetAllAccessTokens").Invoke(accessor, null) as IEnumerable<object>;
-
-            foreach (var internalAt in internalAccessTokens)
-            {
-                internalAt.GetType().GetRuntimeMethods().Single(m => m.Name == "set_ExpiresOnUnixTimestamp").Invoke(internalAt, new[] { expiredValue });
-                accessor.GetType().GetMethod("SaveAccessToken").Invoke(accessor, new[] { internalAt });
-            }
-
-            var ctor = typeof(TokenCacheNotificationArgs).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance).Single();
-
-            var argz = ctor.Invoke(new object[] { pca.UserTokenCache, GetClientId(), null, true, false, true, null });
-            var task = pca.UserTokenCache.GetType().GetRuntimeMethods()
-                .Single(m => m.Name == "Microsoft.Identity.Client.ITokenCacheInternal.OnAfterAccessAsync")
-                .Invoke(pca.UserTokenCache, new[] { argz });
+            var task = pca.UserTokenCache.GetType()
+                .GetRuntimeMethods()
+                .Single(n => n.Name == "ExpireAllAccessTokensForTestAsync")
+                .Invoke(pca.UserTokenCache, null);
 
             await (task as Task).ConfigureAwait(false);
 
